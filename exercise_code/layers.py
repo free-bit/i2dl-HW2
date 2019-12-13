@@ -21,10 +21,11 @@ def affine_forward(x, w, b):
     """
     out = None
     #############################################################################
-    # TODO: Implement the affine forward pass. Store the result in out. You     #
+    # DONE: Implement the affine forward pass. Store the result in out. You     #
     # will need to reshape the input into rows.                                 #
     #############################################################################
-
+    x_row = np.reshape(x, (x.shape[0], -1))
+    out = x_row @ w + b # NxD * DxM + Mx1 (Bias parameters are shared among different inputs)
     #############################################################################
     #                             END OF YOUR CODE                              #
     #############################################################################
@@ -51,9 +52,13 @@ def affine_backward(dout, cache):
     x, w, b = cache
     dx, dw, db = None, None, None
     #############################################################################
-    # TODO: Implement the affine backward pass.                                 #
+    # DONE: Implement the affine backward pass.                                 #
     #############################################################################
-
+    dx = dout @ w.T            # NxD (Shape of loss [scalar] wrt x [matrix: NxD]) = NxM (Shape of dout) * MxD (Shape of w.T)
+    dx = np.reshape(dx, x.shape)
+    x_row = np.reshape(x, (x.shape[0], -1))
+    dw = x_row.T @ dout   # DxM (Shape of loss [scalar] wrt w [matrix: DxM]) = DxN (Shape of x.T) * NxM (Shape of dout)
+    db = np.sum(dout, axis=0)  # Mx1 (Shape of loss [scalar] wrt b [matrix: Mx1]) = 1xN (Vector of ones) * NxM (Shape of dout)
     #############################################################################
     #                             END OF YOUR CODE                              #
     #############################################################################
@@ -73,9 +78,9 @@ def relu_forward(x):
     """
     out = None
     #############################################################################
-    # TODO: Implement the ReLU forward pass.                                    #
+    # DONE: Implement the ReLU forward pass.                                    #
     #############################################################################
-
+    out = np.maximum(0, x)
     #############################################################################
     #                             END OF YOUR CODE                              #
     #############################################################################
@@ -96,9 +101,10 @@ def relu_backward(dout, cache):
     """
     dx, x = None, cache
     #############################################################################
-    # TODO: Implement the ReLU backward pass.                                   #
+    # DONE: Implement the ReLU backward pass.                                   #
     #############################################################################
-
+    dr_dx = np.where(x > 0, 1, 0)
+    dx = dr_dx * dout
     #############################################################################
     #                             END OF YOUR CODE                              #
     #############################################################################
@@ -296,7 +302,7 @@ def dropout_forward(x, dropout_param):
         # TODO: Implement the training phase forward pass for inverted dropout.   #
         # Store the dropout mask in the mask variable.                            #
         ###########################################################################
-
+        pass
         ###########################################################################
         #                            END OF YOUR CODE                             #
         ###########################################################################
@@ -304,7 +310,7 @@ def dropout_forward(x, dropout_param):
         ###########################################################################
         # TODO: Implement the test phase forward pass for inverted dropout.       #
         ###########################################################################
-
+        pass
         ###########################################################################
         #                            END OF YOUR CODE                             #
         ###########################################################################
@@ -331,7 +337,7 @@ def dropout_backward(dout, cache):
         ###########################################################################
         # TODO: Implement the training phase backward pass for inverted dropout.  #
         ###########################################################################
-        
+        pass
         ###########################################################################
         #                            END OF YOUR CODE                             #
         ###########################################################################
