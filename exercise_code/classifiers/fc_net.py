@@ -1,8 +1,10 @@
 import numpy as np
+import re
 
 from exercise_code.layers import *
 from exercise_code.layer_utils import *
 
+numeric_suffix = lambda text: re.search(r"\d+", text).group(0)
 
 class TwoLayerNet(object):
     """
@@ -42,7 +44,7 @@ class TwoLayerNet(object):
             self.loss_function = 'softmax'
 
         ############################################################################
-        # TODO: Initialize the weights and biases of the two-layer net. Weights    #
+        # DONE: Initialize the weights and biases of the two-layer net. Weights    #
         # should be initialized from a Gaussian with standard deviation equal to   #
         # weight_scale, and biases should be initialized to zero. All weights and  #
         # biases should be stored in the dictionary self.params, with first layer  #
@@ -105,16 +107,16 @@ class TwoLayerNet(object):
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
         reg = self.reg
-        loss, dx = softmax_loss(scores, y)
-        loss += (np.sum(W1**2) + np.sum(W2**2)) * (reg/2) # Regularization term is added to loss, halved based on description in the task
+        loss, dscores = softmax_loss(scores, y)
+        loss += (np.sum(W1**2) + np.sum(W2**2)) * (reg/2)   # Regularization term is added to loss, lambda is halved based on description in the task
 
-        dh, dw2, db2 = affine_backward(dx, cache_fwd2)    # score = w2*h+b
-        dw2 += reg * W2                                   # Regularization term is added to grad, halved based on description in the task
+        dh, dw2, db2 = affine_backward(dscores, cache_fwd2) # score = w2*h+b
+        dw2 += reg * W2                                     # Regularization term is added to grad, lambda is halved based on description in the task
 
-        do = relu_backward(dh, cache_relu)                # h = ReLU(o)
+        do = relu_backward(dh, cache_relu)                  # h = ReLU(o)
         
-        dx, dw1, db1 = affine_backward(do, cache_fwd1)    # o = w1*x+b
-        dw1 += reg * W1                                   # Regularization term is added to grad, halved based on description in the task
+        dx, dw1, db1 = affine_backward(do, cache_fwd1)      # o = w1*x+b
+        dw1 += reg * W1                                     # Regularization term is added to grad, lambda is halved based on description in the task
 
         grads = {"W1": dw1, "W2": dw2, "b1": db1, "b2": db2}
         ############################################################################
@@ -179,7 +181,7 @@ class FullyConnectedNet(object):
             raise Exception('Wrong loss function')
 
         ############################################################################
-        # TODO: Initialize the parameters of the network, storing all values in    #
+        # DONE: Initialize the parameters of the network, storing all values in    #
         # the self.params dictionary. Store weights and biases for the first layer #
         # in W1 and b1; for the second layer use W2 and b2, etc. Weights should be #
         # initialized from a normal distribution with standard deviation equal to  #
@@ -190,7 +192,20 @@ class FullyConnectedNet(object):
         # beta2, etc. Scale parameters should be initialized to one and shift      #
         # parameters should be initialized to zero.                                #
         ############################################################################
+        num_hidden = len(hidden_dims) # Number of hidden layers
+        num_layers = num_hidden + 1   # Number of all layers
 
+        # Generate keys for dictionary of parameters for all layers
+        weight_keys = ["W"+str(i) for i in range(1, num_layers+1)] 
+        bias_keys = ["b"+str(i) for i in range(1, num_layers+1)]
+
+        # Initialize layer parameters
+        # Keep dimensions such that input and output dimensions are also included
+        dims = [input_dim, *hidden_dims, num_classes]
+        # Iterate over dims, two elements at a time
+        for i in range(num_layers):
+          self.params[weight_keys[i]] = np.random.normal(scale=weight_scale, size=(dims[i], dims[i+1])) 
+          self.params[bias_keys[i]] = np.zeros((dims[i+1],))
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -236,7 +251,7 @@ class FullyConnectedNet(object):
 
         scores = None
         ############################################################################
-        # TODO: Implement the forward pass for the fully-connected net, computing  #
+        # DONE: Implement the forward pass for the fully-connected net, computing  #
         # the class scores for X and storing them in the scores variable.          #
         #                                                                          #
         # When using dropout, you'll need to pass self.dropout_param to each       #
@@ -247,7 +262,29 @@ class FullyConnectedNet(object):
         # self.bn_params[1] to the forward pass for the second batch normalization #
         # layer, etc.                                                              #
         ############################################################################
+        all_keys = list(self.params.keys())
+        all_keys.sort(key=numeric_suffix) # Keys are probably already sorted, but doesn't have to be.
+        weight_keys = list(filter(lambda p: p.startswith("W"), all_keys))
+        bias_keys = list(filter(lambda p: p.startswith("b"), all_keys))
+        
+        num_hidden = len(weight_keys) - 1
+        fwd_caches = []
+        relu_caches = []
+        Xi = X
+        for i in range(num_hidden):
+          weight_key, bias_key = weight_keys[i], bias_keys[i]
+          Wi, bi = self.params[weight_key], self.params[bias_key] # Extract W & b for the ith iteration
+          fc, cache_fwd = affine_forward(Xi, Wi, bi)
+          active, cache_relu = relu_forward(fc)
 
+          Xi = active                                             # Input to next iteration
+          fwd_caches.append(cache_fwd)
+          relu_caches.append(cache_relu)
+
+        weight_key, bias_key = weight_keys[-1], bias_keys[-1]
+        W, b = self.params[weight_key], self.params[bias_key]
+        scores, cache_fwd = affine_forward(Xi, W, b)
+        fwd_caches.append(cache_fwd)
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -262,7 +299,7 @@ class FullyConnectedNet(object):
         # By default we choose the softmax loss
         loss, dscores = self.chosen_loss_function(scores, y)
         #######################################################################
-        # TODO: Implement the backward pass for the fully-connected net. Store#
+        # DONE: Implement the backward pass for the fully-connected net. Store#
         # the loss in the loss variable and gradients in the grads dictionary.#
         #                                                                     #
         #1_FullyConnectedNets.ipynb                                           #
@@ -278,7 +315,40 @@ class FullyConnectedNet(object):
         # a factor of 0.5 to simplify the expression for the gradient.        #
         #                                                                     #
         #######################################################################
-        
+        reg_coeff = self.reg
+        reg_sum = 0
+        weight_key, bias_key = weight_keys[-1], bias_keys[-1]
+
+        # Calculate backward pass for the last affine layer
+        cache_fwd = fwd_caches.pop()
+        dxi, dwi, dbi = affine_backward(dscores, cache_fwd)
+
+        # Store grads for the last layer
+        wi = self.params[weight_key]
+        dwi += reg_coeff * wi
+        reg_sum += np.sum(wi**2)
+        grads.update({weight_key: dwi, bias_key: dbi})
+  
+        # Calculate backward pass for each hidden layer
+        for i in range(num_hidden-1, -1, -1):
+          weight_key, bias_key = weight_keys[i], bias_keys[i]
+
+          # Calculate backward pass for ReLU
+          cache_relu = relu_caches.pop()
+          do = relu_backward(dxi, cache_relu)
+
+          # Calculate backward pass for affine
+          cache_fwd = fwd_caches.pop()
+          dxi, dwi, dbi = affine_backward(do, cache_fwd)
+          wi = self.params[weight_key]
+          dwi += reg_coeff* wi
+          reg_sum += np.sum(wi**2)
+
+          # Store grads for ith layer
+          grads.update({weight_key: dwi, bias_key: dbi})
+
+        # Regularization term is added to loss, lambda is halved based on description in the task
+        loss += reg_sum * reg_coeff / 2
         #######################################################################
         #                             END OF YOUR CODE                        #
         #######################################################################
